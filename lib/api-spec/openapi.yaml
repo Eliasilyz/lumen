@@ -1,0 +1,837 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Lumen — Catholic Prayer Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+  - name: prayers
+  - name: categories
+  - name: bookmarks
+  - name: calendar
+  - name: wall
+  - name: donations
+  - name: me
+  - name: dashboard
+  - name: admin
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [me]
+      summary: Get current user profile + preferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/preferences:
+    patch:
+      operationId: updatePreferences
+      tags: [me]
+      summary: Update reading & reminder preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreferencesBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Preferences"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /prayers:
+    get:
+      operationId: listPrayers
+      tags: [prayers]
+      summary: List prayers with filters
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Search keyword (matches title/body)
+        - in: query
+          name: categorySlug
+          schema: { type: string }
+        - in: query
+          name: group
+          schema:
+            type: string
+            enum: [daily, needs, liturgical]
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 24 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrayerList"
+
+  /prayers/{slug}:
+    get:
+      operationId: getPrayer
+      tags: [prayers]
+      summary: Get prayer by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrayerDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List prayer categories
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /bookmarks:
+    get:
+      operationId: listMyBookmarks
+      tags: [bookmarks]
+      summary: List bookmarked prayers (current user)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Prayer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: addBookmark
+      tags: [bookmarks]
+      summary: Bookmark a prayer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddBookmarkBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bookmark"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /bookmarks/{prayerId}:
+    delete:
+      operationId: removeBookmark
+      tags: [bookmarks]
+      summary: Remove a bookmark
+      parameters:
+        - in: path
+          name: prayerId
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /calendar/today:
+    get:
+      operationId: getToday
+      tags: [calendar]
+      summary: Get today's liturgical day
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiturgicalDay"
+
+  /calendar/month:
+    get:
+      operationId: getMonth
+      tags: [calendar]
+      summary: Get a month of liturgical days
+      parameters:
+        - in: query
+          name: year
+          required: true
+          schema: { type: integer, minimum: 2000, maximum: 2100 }
+        - in: query
+          name: month
+          required: true
+          schema: { type: integer, minimum: 1, maximum: 12 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LiturgicalDay"
+
+  /wall:
+    get:
+      operationId: listWallPosts
+      tags: [wall]
+      summary: List approved Wall of Hope posts
+      parameters:
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [healing, family, disaster, work, vocation, gratitude, other]
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WallPostList"
+    post:
+      operationId: createWallPost
+      tags: [wall]
+      summary: Submit a new prayer message to the Wall of Hope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWallPostBody"
+      responses:
+        "201":
+          description: Created (pending moderation)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WallPost"
+        "429":
+          description: Too many submissions
+
+  /wall/{id}/pray:
+    post:
+      operationId: prayForWallPost
+      tags: [wall]
+      summary: Increment "I'm praying for this" counter
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WallPost"
+
+  /donations:
+    post:
+      operationId: createDonation
+      tags: [donations]
+      summary: Create a donation intent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDonationBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonationIntent"
+
+  /donations/transparency:
+    get:
+      operationId: getTransparency
+      tags: [donations]
+      summary: Public transparency report
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransparencyReport"
+
+  /dashboard/today:
+    get:
+      operationId: getTodayDashboard
+      tags: [dashboard]
+      summary: Today's hub — liturgy + recommended prayer + recent wall + donation progress
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodayDashboard"
+
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      tags: [admin]
+      summary: Admin overview metrics
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/prayers:
+    post:
+      operationId: adminCreatePrayer
+      tags: [admin]
+      summary: Create a prayer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertPrayerBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prayer"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/prayers/{id}:
+    patch:
+      operationId: adminUpdatePrayer
+      tags: [admin]
+      summary: Update a prayer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertPrayerBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prayer"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      operationId: adminDeletePrayer
+      tags: [admin]
+      summary: Delete a prayer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/wall/pending:
+    get:
+      operationId: adminListPendingWall
+      tags: [admin]
+      summary: List Wall of Hope posts awaiting moderation
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WallPost"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/wall/{id}/moderate:
+    post:
+      operationId: adminModerateWallPost
+      tags: [admin]
+      summary: Approve or reject a Wall of Hope post
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerateWallBody"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WallPost"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/donations:
+    get:
+      operationId: adminListDonations
+      tags: [admin]
+      summary: List recent donations
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Donation"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  responses:
+    Unauthorized:
+      description: Not signed in
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Not authorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+
+    Category:
+      type: object
+      required: [id, slug, name, group, prayerCount]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        group:
+          type: string
+          enum: [daily, needs, liturgical]
+        description: { type: string, nullable: true }
+        prayerCount: { type: integer }
+
+    Prayer:
+      type: object
+      required: [id, slug, title, summary, body, group, createdAt]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        body: { type: string, description: "Markdown body" }
+        group:
+          type: string
+          enum: [daily, needs, liturgical]
+        categoryId: { type: integer, nullable: true }
+        categorySlug: { type: string, nullable: true }
+        categoryName: { type: string, nullable: true }
+        author: { type: string, nullable: true }
+        readingMinutes: { type: integer }
+        bookmarked: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    PrayerDetail:
+      allOf:
+        - $ref: "#/components/schemas/Prayer"
+        - type: object
+          properties:
+            related:
+              type: array
+              items:
+                $ref: "#/components/schemas/Prayer"
+
+    PrayerList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prayer"
+        total: { type: integer }
+
+    UpsertPrayerBody:
+      type: object
+      required: [slug, title, summary, body, group]
+      properties:
+        slug: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        body: { type: string }
+        group:
+          type: string
+          enum: [daily, needs, liturgical]
+        categoryId: { type: integer, nullable: true }
+        author: { type: string, nullable: true }
+
+    Bookmark:
+      type: object
+      required: [prayerId, createdAt]
+      properties:
+        prayerId: { type: integer }
+        createdAt: { type: string, format: date-time }
+
+    AddBookmarkBody:
+      type: object
+      required: [prayerId]
+      properties:
+        prayerId: { type: integer }
+
+    LiturgicalDay:
+      type: object
+      required: [date, season, color, isFeast, title]
+      properties:
+        date: { type: string, format: date }
+        season:
+          type: string
+          enum: [advent, christmas, lent, holy_week, easter, ordinary]
+        color:
+          type: string
+          enum: [violet, white, red, green, rose, black]
+        isFeast: { type: boolean }
+        title: { type: string }
+        saint: { type: string, nullable: true }
+        reflection: { type: string, nullable: true }
+        recommendedPrayerSlug: { type: string, nullable: true }
+        recommendedPrayerTitle: { type: string, nullable: true }
+
+    WallPost:
+      type: object
+      required: [id, displayName, message, category, prayCount, status, createdAt]
+      properties:
+        id: { type: integer }
+        displayName: { type: string, description: "Anonymous => 'Anonymous'" }
+        message: { type: string }
+        category:
+          type: string
+          enum: [healing, family, disaster, work, vocation, gratitude, other]
+        prayCount: { type: integer }
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        createdAt: { type: string, format: date-time }
+
+    WallPostList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WallPost"
+        total: { type: integer }
+
+    CreateWallPostBody:
+      type: object
+      required: [message, category, anonymous]
+      properties:
+        displayName: { type: string, nullable: true, maxLength: 60 }
+        message: { type: string, minLength: 8, maxLength: 600 }
+        category:
+          type: string
+          enum: [healing, family, disaster, work, vocation, gratitude, other]
+        anonymous: { type: boolean }
+
+    ModerateWallBody:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        note: { type: string, nullable: true }
+
+    Donation:
+      type: object
+      required: [id, amount, currency, donorName, isRecurring, status, method, createdAt]
+      properties:
+        id: { type: integer }
+        amount: { type: integer, description: "Smallest currency unit (e.g. cents / rupiah)" }
+        currency: { type: string }
+        donorName: { type: string }
+        donorEmail: { type: string, nullable: true }
+        message: { type: string, nullable: true }
+        isRecurring: { type: boolean }
+        status:
+          type: string
+          enum: [pending, paid, failed, refunded]
+        method:
+          type: string
+          enum: [va, qris, ewallet, card, manual]
+        createdAt: { type: string, format: date-time }
+
+    CreateDonationBody:
+      type: object
+      required: [amount, currency, method, donorName, isRecurring]
+      properties:
+        amount: { type: integer, minimum: 1000 }
+        currency: { type: string, enum: [IDR, USD, EUR] }
+        method:
+          type: string
+          enum: [va, qris, ewallet, card, manual]
+        donorName: { type: string, minLength: 1, maxLength: 80 }
+        donorEmail: { type: string, format: email, nullable: true }
+        message: { type: string, maxLength: 280, nullable: true }
+        isRecurring: { type: boolean }
+
+    DonationIntent:
+      type: object
+      required: [id, status, instructions]
+      properties:
+        id: { type: integer }
+        status:
+          type: string
+          enum: [pending, paid, failed]
+        instructions: { type: string, description: "Human-readable next steps for the donor" }
+        gatewayConfigured: { type: boolean }
+
+    TransparencyReport:
+      type: object
+      required: [goalAmount, raisedAmount, currency, donorCount, recentDonors, allocations]
+      properties:
+        goalAmount: { type: integer }
+        raisedAmount: { type: integer }
+        currency: { type: string }
+        donorCount: { type: integer }
+        recentDonors:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentDonor"
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Allocation"
+
+    RecentDonor:
+      type: object
+      required: [donorName, amount, currency, createdAt]
+      properties:
+        donorName: { type: string }
+        amount: { type: integer }
+        currency: { type: string }
+        message: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Allocation:
+      type: object
+      required: [label, percent, description]
+      properties:
+        label: { type: string }
+        percent: { type: integer }
+        description: { type: string }
+
+    Preferences:
+      type: object
+      required: [fontScale, theme, morningReminder, eveningReminder, reminderChannel, language]
+      properties:
+        fontScale:
+          type: string
+          enum: [sm, md, lg, xl]
+        theme:
+          type: string
+          enum: [light, dark, system]
+        morningReminder: { type: boolean }
+        eveningReminder: { type: boolean }
+        reminderChannel:
+          type: string
+          enum: [email, push, none]
+        language:
+          type: string
+          enum: [id, en]
+
+    UpdatePreferencesBody:
+      type: object
+      properties:
+        fontScale:
+          type: string
+          enum: [sm, md, lg, xl]
+        theme:
+          type: string
+          enum: [light, dark, system]
+        morningReminder: { type: boolean }
+        eveningReminder: { type: boolean }
+        reminderChannel:
+          type: string
+          enum: [email, push, none]
+        language:
+          type: string
+          enum: [id, en]
+
+    MeResponse:
+      type: object
+      required: [user, preferences, isAdmin, bookmarkedPrayerIds]
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        preferences:
+          $ref: "#/components/schemas/Preferences"
+        isAdmin: { type: boolean }
+        bookmarkedPrayerIds:
+          type: array
+          items: { type: integer }
+
+    UserProfile:
+      type: object
+      required: [id, displayName]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        email: { type: string, nullable: true }
+
+    TodayDashboard:
+      type: object
+      required: [today, recommendedPrayer, featuredPrayers, recentWallPosts, transparency]
+      properties:
+        today:
+          $ref: "#/components/schemas/LiturgicalDay"
+        recommendedPrayer:
+          $ref: "#/components/schemas/Prayer"
+        featuredPrayers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Prayer"
+        recentWallPosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WallPost"
+        transparency:
+          $ref: "#/components/schemas/TransparencyReport"
+
+    AdminSummary:
+      type: object
+      required: [totals, pendingWallPosts, recentDonations, prayerGroupBreakdown]
+      properties:
+        totals:
+          type: object
+          required: [prayers, wallPosts, donations, raisedAmount]
+          properties:
+            prayers: { type: integer }
+            wallPosts: { type: integer }
+            donations: { type: integer }
+            raisedAmount: { type: integer }
+        pendingWallPosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WallPost"
+        recentDonations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Donation"
+        prayerGroupBreakdown:
+          type: array
+          items:
+            type: object
+            required: [group, count]
+            properties:
+              group:
+                type: string
+                enum: [daily, needs, liturgical]
+              count: { type: integer }
